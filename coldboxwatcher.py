@@ -9,17 +9,21 @@ import json
 import requests
 import os,glob,time
 import privatewebhookurl # this file should just contain the line "webhook_url = 'https://hooks.slack.com/services/.....'
+import datetime
 
 def sendwebhook(text):
     # Set the webhook_url to the one provided by Slack when you create the webhook at https://my.slack.com/services/new/incoming-webhook/
-    #webhook_url = 'https://hooks.slack.com/services/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'
-
+    # webhooks have the form shown below - they should be kept private. The webhook URL below is not valid
+    # webhook_url = 'https://hooks.slack.com/services/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'
+    #privatewebhookurl.webhook_url
+    
     
     slack_data = {'text': text, 'channel': '#webhooktest', 'username': 'ColdBoxWatcher','toxen': 'abcd', 'icon_url': 'https://www.flaticon.com/free-icon/circuit-board_1457527'}
     #others "token, channel, text, icon_url, username, blocks'
     
     response = requests.post(privatewebhookurl.webhook_url, data=json.dumps(slack_data),headers={'Content-Type': 'application/json'})
     if response.status_code != 200:
+        print('ug')
         raise ValueError(
             'Request to slack returned an error %s, the response is:\n%s'
             % (response.status_code, response.text)
@@ -93,23 +97,30 @@ class DS18B20:
 up_bnd = 26 # high temperature danger range
 low_bnd = 21 # low temperature danger range
 
-text = '{} {} {} {} {}{}'.format('Cold box watcher started, will send warning if temperature outside',
-                                 low_bnd,'to',up_bnd,u'\N{DEGREE SIGN}','C')
-sendwebhook(text)
+startupslacktext = '{} {} {} {} {}{}'.format('I have started watching and will warn if temperature outside range',
+                                             low_bnd,'to',up_bnd,u'\N{DEGREE SIGN}','C')
+print(startupslacktext)
+sendwebhook(startupslacktext)
+weekno_prev=100 # weekno goes between 0 [monday] to 6 [sunday]
 
 temp_prev=0
 while True:
     x = DS18B20()
     temp=x.tempC(0)
     temp_rnd=round(temp)
+    weekno = datetime.datetime.today().weekday()
+    if weekno != weekno_prev:
+        regulartext = '{} {}{}{}'.format('I am watching. Current temperature is',temp_rnd,u'\N{DEGREE SIGN}','C')
+        sendwebhook(regulartext)
     text = '{} {} {} {} {} {} {} {} {} {}'
     print(text.format('raw:',str(temp),'rnd:',str(temp_rnd),'prev:',str(temp_prev),
                       'upperbound:',str(up_bnd),'lowerbound:',str(low_bnd)))
     if temp_rnd != temp_prev and temp_rnd >= up_bnd or temp_rnd <= low_bnd:
         print('sending a warning to Slack')
-        text='{} {}{}{}'.format('Coldbox temperature is out of allowed range at',str(temp_rnd),u'\N{DEGREE SIGN}','C')
-        sendwebhook(text)
+        warningtext='{} {}{}{}'.format('Coldbox temperature is out of allowed range at',str(temp_rnd),u'\N{DEGREE SIGN}','C')
+        sendwebhook(warningtext)
     temp_prev = temp_rnd
+    weekno_prev = weekno
     time.sleep(1)
     
    
